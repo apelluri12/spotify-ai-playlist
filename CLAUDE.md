@@ -132,22 +132,39 @@ not assume conversation context matches the repository.
 
 The last verified application baseline is:
 
-- `main` at commit `128f4ec`, synchronized with `origin/main` before this
-  `CLAUDE.md` file was created.
-- Pull request #1 was merged in commit `128f4ec`.
+- `origin/main` at commit `f63b6b9` (PR #2 merged: adds this `CLAUDE.md` and
+  the initial PKCE helpers). PR #1 was merged earlier at `128f4ec`.
+- Active work is happening on `feature/spotify-auth`, currently at `558b753`,
+  one commit ahead of what's merged to `main`. That commit is **not yet
+  merged** — do not assume `main` has it.
 - The project has a Python 3.13 virtual environment in `.venv` (ignored by Git).
 - Runtime and development dependencies are separated into `requirements.txt`
-  and `requirements-dev.txt`.
+  and `requirements-dev.txt`. `httpx` and `pydantic` were moved/added to
+  `requirements.txt` as explicit runtime dependencies once `app/spotify/auth.py`
+  started importing them directly — don't let a dependency used by
+  application code live only in `requirements-dev.txt`.
 - `app/main.py` defines a FastAPI application and `GET /health`.
-- `tests/test_health.py` verifies the health endpoint returns HTTP 200 and
-  `{"status": "ok"}`.
-- The test suite passes with one test.
+- `app/spotify/auth.py` implements the Spotify Authorization Code + PKCE flow,
+  as pure/injectable functions with no HTTP routes wired up yet:
+  - `generate_pkce_verifier()` / `generate_pkce_challenge(verifier)` — RFC 7636
+  - `generate_oauth_state()` — CSRF token generator
+  - `build_authorization_url(...)` — builds the Spotify `/authorize` URL
+  - `exchange_code_for_tokens(...)` — trades an auth code for tokens via
+    Spotify's `/api/token`, PKCE-based (no client secret), returns a validated
+    `TokenResponse` Pydantic model, raises `SpotifyTokenError` on failure
+    (message carries only status + Spotify's error code, never secrets)
+- `tests/test_health.py` and `tests/test_auth.py` cover the above. The test
+  suite passes with 17 tests (1 health, 16 auth).
+- Not yet built: `app/spotify/routes.py` (`GET /auth/login`, `GET /auth/callback`)
+  and the in-memory state store that ties the pure functions above into an
+  actual HTTP flow. This is the next planned slice.
 - FastAPI/Starlette currently emits a dependency-level deprecation warning about
   its test client and httpx. Do not suppress or change dependencies blindly;
   evaluate compatibility before altering them.
 
-If this file has not been committed yet, `CLAUDE.md` should be the only expected
-worktree change. Verify that assumption with `git status` before proceeding.
+Verify this against `git status`, `git log --oneline -5`, and
+`git branch --show-current` before proceeding — do not trust this section
+blindly, it goes stale the moment new commits land.
 
 Useful commands:
 
