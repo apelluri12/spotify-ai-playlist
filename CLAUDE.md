@@ -132,17 +132,21 @@ not assume conversation context matches the repository.
 
 The last verified application baseline is:
 
-- `origin/main` at commit `f63b6b9` (PR #2 merged: adds this `CLAUDE.md` and
-  the initial PKCE helpers). PR #1 was merged earlier at `128f4ec`.
-- Active work is happening on `feature/spotify-auth`, currently at `a52455b`.
-  The branch contains authentication work that is **not yet merged** — do not
-  assume `main` has it.
+- `origin/main` includes PR #3 at merge commit `d6e68c2`. It contains the
+  authentication groundwork: PKCE helpers, OAuth state and authorization URL
+  construction, token exchange, and the in-memory OAuth state store.
+- Active work is happening on `feature/spotify-auth-routes`, which began from
+  `d6e68c2`. Work on this branch is **not yet merged** — do not assume `main`
+  has it.
 - The project has a Python 3.13 virtual environment in `.venv` (ignored by Git).
 - Runtime and development dependencies are separated into `requirements.txt`
-  and `requirements-dev.txt`. `httpx` and `pydantic` were moved/added to
-  `requirements.txt` as explicit runtime dependencies once `app/spotify/auth.py`
-  started importing them directly — don't let a dependency used by
-  application code live only in `requirements-dev.txt`.
+  and `requirements-dev.txt`. Runtime dependencies imported by application code
+  belong in `requirements.txt`; this includes `httpx`, `pydantic`, and
+  `pydantic-settings`.
+- `app/config.py` defines immutable, environment-backed `AppSettings`. It
+  requires a nonblank Spotify client ID and validates the callback URI. The
+  local default is `http://127.0.0.1:8000/auth/callback`; `.env.example`
+  documents the expected variables while `.env` remains ignored.
 - `app/main.py` defines a FastAPI application and `GET /health`.
 - `app/spotify/auth.py` implements the Spotify Authorization Code + PKCE flow,
   as pure/injectable functions with no HTTP routes wired up yet:
@@ -158,12 +162,11 @@ The last verified application baseline is:
   are consumed once, and are associated with their PKCE verifier. This store
   loses data on restart, does not support multiple workers, and is not suitable
   for production.
-- `tests/test_health.py`, `tests/test_auth.py`, and `tests/test_routes.py` cover
-  the current behavior. The test suite passes with 24 tests (1 health, 16 auth,
-  and 7 state-store tests).
-- Not yet built: validated Spotify configuration, `GET /auth/login`,
-  `GET /auth/callback`, or server-side token storage. These are the next planned
-  authentication slices.
+- `tests/test_health.py`, `tests/test_auth.py`, `tests/test_routes.py`, and
+  `tests/test_config.py` cover the current behavior. The test suite passes with
+  35 tests.
+- Not yet built: `GET /auth/login`, `GET /auth/callback`, or server-side token
+  storage. These are the next planned authentication slices.
 - FastAPI/Starlette currently emits a dependency-level deprecation warning about
   its test client and httpx. Do not suppress or change dependencies blindly;
   evaluate compatibility before altering them.
@@ -182,10 +185,10 @@ uvicorn app.main:app --reload
 
 ## Next Feature: Spotify Authentication
 
-The next branch should be:
+The current feature branch is:
 
 ```text
-feature/spotify-auth
+feature/spotify-auth-routes
 ```
 
 The chosen authentication approach is Spotify Authorization Code with PKCE.
@@ -212,7 +215,7 @@ Proposed boundaries, to be introduced only as each becomes necessary:
 - `app/spotify/auth.py`: PKCE generation, authorization URL construction, and
   token-exchange behavior.
 - `app/spotify/routes.py`: FastAPI login and callback endpoints.
-- Configuration module: validated Spotify client ID and redirect URI.
+- `app/config.py`: validated Spotify client ID and redirect URI.
 
 For the first local, single-user milestone, temporary OAuth state and tokens may
 be stored in memory if the limitation is clearly documented. In-memory storage
@@ -220,14 +223,12 @@ loses data on restart and is unsafe for multiple workers or production. A later
 production design should use encrypted server-side persistence such as Redis or
 PostgreSQL.
 
-Before writing authentication code:
+Before wiring the authentication routes:
 
-1. Verify the repository is on clean, updated `main`.
-2. Create `feature/spotify-auth`.
-3. Have the developer register a Spotify developer application.
-4. Configure the exact callback URI in Spotify's dashboard.
-5. Decide and test the smallest first implementation slice, preferably validated
-   configuration or pure PKCE helpers before adding HTTP routes.
+1. Have the developer register a Spotify developer application.
+2. Configure the exact callback URI in Spotify's dashboard.
+3. Copy `.env.example` to `.env` and set the Spotify client ID locally.
+4. Implement and test `GET /auth/login` before adding the callback route.
 
 ## Security Boundaries
 
